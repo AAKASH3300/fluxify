@@ -1,0 +1,12 @@
+.vscode/
+src/
+.gitignore
+.eslintrc.js
+tsconfig.json
+vsc-extension-quickstart.md
+*.vsix
+**/*.map
+out/test/
+node_modules/typescript/
+node_modules/eslint/
+node_modules/@types/
