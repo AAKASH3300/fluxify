@@ -46,7 +46,7 @@ Thank you for your interest in contributing to Fluxify! 🌊
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/fluxify.git
+git clone https://github.com/AAKASH3300/fluxify.git
 cd fluxify
 
 # Install dependencies

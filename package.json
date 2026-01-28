@@ -171,11 +171,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/fluxify"
+    "url": "https://github.com/AAKASH3300/fluxify.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/fluxify/issues"
+    "url": "https://github.com/AAKASH3300/fluxify/issues"
   },
-  "homepage": "https://github.com/yourusername/fluxify#readme",
+  "homepage": "https://github.com/AAKASH3300/fluxify#readme",
   "license": "MIT"
 }

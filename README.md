@@ -1,10 +1,12 @@
 <div align="center">
 
+<img src="resources/fluxify-icon.png" width="128" alt="Fluxify Logo" />
+
 # 🌊 Fluxify
 
 **Transform anything into anything**
 
-[![Fluxify](https://img.shields.io/badge/Fluxify-v1.0.0-00d4ff?style=for-the-badge&logo=visual-studio-code)](marketplace-link)
+[![Fluxify](https://img.shields.io/badge/Fluxify-v1.0.0-00d4ff?style=for-the-badge&logo=visual-studio-code)][marketplace-link]
 
 Transform files between 25+ formats with a beautiful interface and lightning-fast performance.
 
@@ -124,3 +126,8 @@ Fluxify features a stunning cyberpunk-inspired interface with:
 Transform anything into anything with Fluxify 🌊
 
 </div>
+
+<!-- Link References -->
+[marketplace-link]: https://marketplace.visualstudio.com/items?itemName=AakashB.fluxify
+[github-link]: https://github.com/AAKASH3300/fluxify
+[issues-link]: https://github.com/AAKASH3300/fluxify/issues
