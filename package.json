@@ -129,6 +129,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show notification on successful conversion"
+        },
+        "fluxify.autoOpenFile": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open the file after conversion"
         }
       }
     }

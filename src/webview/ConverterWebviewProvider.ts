@@ -138,6 +138,17 @@ export class ConverterWebviewProvider {
                 data.targetFormat,
                 outputDir
             );
+
+            // Auto-open if enabled
+            const config = vscode.workspace.getConfiguration('fluxify');
+            if (result.success && config.get<boolean>('autoOpenFile', true) && result.outputPath) {
+                try {
+                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(result.outputPath));
+                    await vscode.window.showTextDocument(doc);
+                } catch (error) {
+                    console.error('Failed to auto-open file from webview:', error);
+                }
+            }
     
             ConverterWebviewProvider.currentPanel?.webview.postMessage({
                 command: result.success ? 'conversionComplete' : 'conversionError',

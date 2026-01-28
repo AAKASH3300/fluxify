@@ -107,6 +107,15 @@ async function handleConversion(uri: vscode.Uri, manager: ConversionManager) {
             const result = await manager.convert(fileInfo, targetFormat, outputDir);
             
             if (result.success) {
+                if (config.get<boolean>('autoOpenFile', true) && result.outputPath) {
+                    try {
+                        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(result.outputPath));
+                        await vscode.window.showTextDocument(doc);
+                    } catch (error) {
+                        console.error('Failed to auto-open file:', error);
+                    }
+                }
+
                 if (config.get('showSuccessNotification')) {
                     const action = await vscode.window.showInformationMessage(
                         `✅ Fluxified to ${result.outputPath}`,
