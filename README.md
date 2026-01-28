@@ -2,7 +2,7 @@
 
 <img src="resources/fluxify-icon.png" width="128" alt="Fluxify Logo" />
 
-# 🌊 Fluxify
+# Fluxify
 
 **Transform anything into anything**
 
@@ -126,6 +126,7 @@ Fluxify features a stunning cyberpunk-inspired interface with:
 Transform anything into anything with Fluxify 🌊
 
 </div>
+<img width="1365" height="720" alt="image" src="https://github.com/user-attachments/assets/ecb71260-32a1-4839-8956-d6e6cc61a6bc" />
 
 <!-- Link References -->
 [marketplace-link]: https://marketplace.visualstudio.com/items?itemName=AakashB.fluxify
