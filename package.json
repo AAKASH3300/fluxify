@@ -3,7 +3,7 @@
   "displayName": "Fluxify - File Format Converter",
   "description": "Transform files between 25+ formats with style. Images, documents, and data - all in one beautiful interface.",
   "version": "1.0.0",
-  "publisher": "AakashB",
+  "publisher": "AakashBalasubramanian",
   "icon": "resources/fluxify-icon.png",
   "engines": {
     "vscode": "^1.80.0"
