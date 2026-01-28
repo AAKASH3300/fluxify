@@ -1,0 +1,181 @@
+{
+  "name": "fluxify",
+  "displayName": "Fluxify - File Format Converter",
+  "description": "Transform files between 25+ formats with style. Images, documents, and data - all in one beautiful interface.",
+  "version": "1.0.0",
+  "publisher": "AakashB",
+  "icon": "resources/fluxify-icon.png",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Formatters"
+  ],
+  "keywords": [
+    "fluxify",
+    "converter",
+    "format",
+    "transform",
+    "image",
+    "document",
+    "pdf",
+    "json",
+    "csv",
+    "xml",
+    "conversion",
+    "file converter"
+  ],
+  "activationEvents": [
+    "onCommand:fluxify.openConverter",
+    "onCommand:fluxify.convert",
+    "onCommand:fluxify.convertMultiple"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "fluxify.openConverter",
+        "title": "Fluxify: Open Converter",
+        "category": "Fluxify",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "fluxify.convert",
+        "title": "Fluxify: Convert File",
+        "category": "Fluxify"
+      },
+      {
+        "command": "fluxify.convertMultiple",
+        "title": "Fluxify: Batch Convert",
+        "category": "Fluxify"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "fluxify.convert",
+          "group": "fluxify@1",
+          "when": "resourceExtname =~ /\\.(png|jpg|jpeg|webp|gif|bmp|tiff|tif|pdf|docx|doc|txt|md|html|htm|json|csv|xml|yaml|yml)$/i"
+        },
+        {
+          "command": "fluxify.convertMultiple",
+          "group": "fluxify@2",
+          "when": "explorerResourceIsFolder || listMultiSelection"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "fluxify.convert",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "fluxify.convertMultiple",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "fluxify.openConverter"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "fluxify-sidebar",
+          "title": "Fluxify",
+          "icon": "resources/fluxify-icon.png"
+        }
+      ]
+    },
+    "views": {
+      "fluxify-sidebar": [
+        {
+          "type": "webview",
+          "id": "fluxify.sidebarView",
+          "name": "Converter"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Fluxify",
+      "properties": {
+        "fluxify.outputDirectory": {
+          "type": "string",
+          "default": "same",
+          "enum": [
+            "same",
+            "custom"
+          ],
+          "description": "Where to save converted files"
+        },
+        "fluxify.customOutputPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom output directory path"
+        },
+        "fluxify.deleteOriginal": {
+          "type": "boolean",
+          "default": false,
+          "description": "Delete original file after conversion"
+        },
+        "fluxify.imageQuality": {
+          "type": "number",
+          "default": 90,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "JPEG/WebP quality (1-100)"
+        },
+        "fluxify.showSuccessNotification": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notification on successful conversion"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.x",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "@types/papaparse": "^5.3.15",
+    "@types/js-yaml": "^4.0.9",
+    "@types/xml2js": "^0.4.14",
+    "@types/turndown": "^5.0.5"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.36",
+    "csv-parser": "^3.0.0",
+    "docx": "^8.5.0",
+    "html-pdf-node": "^1.0.8",
+    "js-yaml": "^4.1.0",
+    "mammoth": "^1.6.0",
+    "marked": "^11.0.0",
+    "papaparse": "^5.4.1",
+    "pdf-lib": "^1.17.1",
+    "sharp": "^0.33.0",
+    "turndown": "^7.1.2",
+    "xml2js": "^0.6.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/fluxify"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/fluxify/issues"
+  },
+  "homepage": "https://github.com/yourusername/fluxify#readme",
+  "license": "MIT"
+}

@@ -1,0 +1,230 @@
+:root {
+    --container-pading: 20px;
+    --input-padding-vertical: 6px;
+    --input-padding-horizontal: 10px;
+    --input-margin-vertical: 4px;
+    --input-margin-horizontal: 0;
+}
+
+body {
+    padding: 0;
+    color: var(--vscode-foreground);
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    font-weight: var(--vscode-font-weight);
+    display: flex;
+    justify-content: center;
+    background-color: var(--vscode-editor-background);
+    padding-top: 50px;
+}
+
+.card {
+    background-color: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-widget-border);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    padding: 24px;
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--vscode-widget-border);
+    padding-bottom: 16px;
+    margin-bottom: 8px;
+}
+
+.icon-container {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--vscode-descriptionForeground);
+    letter-spacing: 0.5px;
+}
+
+button {
+    border: none;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.secondary-btn {
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+}
+
+.secondary-btn:hover {
+    background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.primary-btn {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    font-weight: 500;
+}
+
+.primary-btn:hover {
+    background-color: var(--vscode-button-hoverBackground);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.primary-btn:active {
+    transform: translateY(0);
+}
+
+.file-info {
+    background-color: var(--vscode-textBlockQuote-background);
+    border-left: 3px solid var(--vscode-textBlockQuote-border);
+    padding: 8px 12px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 2px;
+    word-break: break-all;
+}
+
+.select-wrapper {
+    position: relative;
+}
+
+select {
+    width: 100%;
+    background-color: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border);
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 4px;
+    appearance: none;
+    cursor: pointer;
+}
+
+select:focus {
+    border-color: var(--vscode-focusBorder);
+    outline: none;
+}
+
+.select-arrow {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 12px;
+}
+
+#loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--vscode-scrollbarSlider-background);
+    border-top-color: var(--vscode-button-background);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Animations */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.slide-down {
+    animation: slideDown 0.3s ease-out forwards;
+}
+
+.slide-up {
+    animation: slideUp 0.3s ease-out forwards;
+}
+
+.hidden {
+    display: none !important;
+}
