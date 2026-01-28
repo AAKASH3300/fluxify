@@ -4,6 +4,8 @@ import * as fs from 'fs';
 import { ConversionManager } from './converters/ConversionManager';
 import { ConverterWebviewProvider } from './webview/ConverterWebviewProvider';
 import { SidebarProvider } from './webview/SidebarProvider';
+import { HistoryManager } from './history/HistoryManager';
+import { HistoryTreeProvider } from './history/HistoryTreeProvider';
 import { FileInfo } from './types/FileInfo';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -26,6 +28,24 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.registerWebviewViewProvider(SidebarProvider.viewType, sidebarProvider)
     );
 
+    // Register History Provider
+    const historyManager = new HistoryManager(context);
+    const historyProvider = new HistoryTreeProvider(historyManager);
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider('fluxify.historyView', historyProvider)
+    );
+
+    // Register History Commands
+    context.subscriptions.push(
+        vscode.commands.registerCommand('fluxify.clearHistory', () => {
+            historyManager.clear();
+            vscode.window.showInformationMessage('Conversion history cleared');
+        }),
+        vscode.commands.registerCommand('fluxify.openHistoryFile', (filePath: string) => {
+            vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
+        })
+    );
+
     // Register Context Menu Command (Single File)
     const convertCommand = vscode.commands.registerCommand(
         'fluxify.convert',
@@ -36,7 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
             
             if (uri) {
-                await handleConversion(uri, conversionManager);
+                await handleConversion(uri, conversionManager, historyManager);
             } else {
                 vscode.window.showInformationMessage("🌊 Fluxify: Please select a file to convert.");
             }
@@ -51,7 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
                 await handleBatchConversion(allUris, conversionManager);
             } else if (uri) {
                 // Fallback to single if only one selected or triggered contextually
-                await handleConversion(uri, conversionManager);
+                await handleConversion(uri, conversionManager, historyManager);
             } else {
                  vscode.window.showInformationMessage("🌊 Fluxify: No files selected for batch conversion.");
             }
@@ -69,7 +89,7 @@ export function deactivate() {
 // Handlers
 // -----------------------------------------------------------------------------
 
-async function handleConversion(uri: vscode.Uri, manager: ConversionManager) {
+async function handleConversion(uri: vscode.Uri, manager: ConversionManager, historyManager: HistoryManager) {
     try {
         const fileInfo = getFileInfo(uri);
         if (!fileInfo) {
@@ -104,9 +124,24 @@ async function handleConversion(uri: vscode.Uri, manager: ConversionManager) {
             const config = vscode.workspace.getConfiguration('fluxify');
             const outputDir = getOutputDirectory(uri, config);
 
+            const origStat = await vscode.workspace.fs.stat(uri);
             const result = await manager.convert(fileInfo, targetFormat, outputDir);
             
             if (result.success) {
+                // Get new size for savings calculation
+                let sizeMsg = "";
+                if (result.outputPath) {
+                    try {
+                         const newStat = await vscode.workspace.fs.stat(vscode.Uri.file(result.outputPath));
+                         const savings = ((origStat.size - newStat.size) / origStat.size * 100).toFixed(1);
+                         const savedBytes = origStat.size - newStat.size;
+                         
+                         if (savedBytes > 0) {
+                             sizeMsg = ` Saved ${savings}%!`;
+                         }
+                    } catch (e) { /* ignore size check errors */ }
+                }
+
                 if (config.get<boolean>('autoOpenFile', true) && result.outputPath) {
                     try {
                         const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(result.outputPath));
@@ -118,16 +153,32 @@ async function handleConversion(uri: vscode.Uri, manager: ConversionManager) {
 
                 if (config.get('showSuccessNotification')) {
                     const action = await vscode.window.showInformationMessage(
-                        `✅ Fluxified to ${result.outputPath}`,
+                        `✅ Fluxified to ${result.outputPath}${sizeMsg}`,
                         'Open File',
                         'Show in Explorer'
                     );
 
                     if (action === 'Open File' && result.outputPath) {
-                         const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(result.outputPath));
-                         await vscode.window.showTextDocument(doc);
+                        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(result.outputPath));
+                        await vscode.window.showTextDocument(doc);
                     } else if (action === 'Show in Explorer' && result.outputPath) {
-                        vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(result.outputPath));
+                        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(result.outputPath));
+                    }
+                }
+
+                // Add to history
+                if (result.outputPath) {
+                    try {
+                        const newStat = await vscode.workspace.fs.stat(vscode.Uri.file(result.outputPath));
+                        historyManager.add({
+                            sourcePath: fileInfo.path,
+                            targetPath: result.outputPath,
+                            sourceFormat: fileInfo.extension,
+                            targetFormat: targetFormat,
+                            fileSize: newStat.size
+                        });
+                    } catch (e) {
+                        console.error('Failed to add to history', e);
                     }
                 }
             } else {

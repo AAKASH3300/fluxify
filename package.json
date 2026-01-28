@@ -2,15 +2,15 @@
   "name": "fluxify",
   "displayName": "Fluxify - File Format Converter",
   "description": "Transform files between 25+ formats with style. Images, documents, and data - all in one beautiful interface.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "AakashBalasubramanian",
   "icon": "resources/fluxify-icon.png",
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Other",
-    "Formatters"
+    "Visualization",
+    "Other"
   ],
   "keywords": [
     "fluxify",
@@ -49,6 +49,12 @@
         "command": "fluxify.convertMultiple",
         "title": "Fluxify: Batch Convert",
         "category": "Fluxify"
+      },
+      {
+        "command": "fluxify.clearHistory",
+        "title": "Clear History",
+        "category": "Fluxify",
+        "icon": "$(trash)"
       }
     ],
     "menus": {
@@ -76,6 +82,13 @@
         {
           "command": "fluxify.openConverter"
         }
+      ],
+      "view/title": [
+        {
+          "command": "fluxify.clearHistory",
+          "when": "view == fluxify.historyView",
+          "group": "navigation"
+        }
       ]
     },
     "viewsContainers": {
@@ -93,6 +106,11 @@
           "type": "webview",
           "id": "fluxify.sidebarView",
           "name": "Converter"
+        },
+        {
+          "type": "tree",
+          "id": "fluxify.historyView",
+          "name": "History"
         }
       ]
     },

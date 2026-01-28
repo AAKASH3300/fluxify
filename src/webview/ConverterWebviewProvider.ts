@@ -54,6 +54,11 @@ export class ConverterWebviewProvider {
                     case 'convert':
                         this.handleConversion(message.data);
                         break;
+                    case 'fileDropped':
+                        if (message.data && message.data.path) {
+                            this.processSelectedFile(message.data.path);
+                        }
+                        break;
                     case 'showInfo':
                         vscode.window.showInformationMessage(message.text);
                         break;
@@ -104,21 +109,25 @@ export class ConverterWebviewProvider {
         });
 
         if (fileUri && fileUri[0]) {
-            const filePath = fileUri[0].fsPath;
-            const fileName = path.basename(filePath);
-            const ext = path.extname(filePath).toLowerCase().substring(1);
-
-            // Send file info back to webview
-            ConverterWebviewProvider.currentPanel?.webview.postMessage({
-                command: 'fileSelected',
-                data: {
-                    path: filePath,
-                    name: fileName,
-                    extension: ext
-                }
-            });
+            this.processSelectedFile(fileUri[0].fsPath);
         }
     }
+
+    private processSelectedFile(filePath: string) {
+        const fileName = path.basename(filePath);
+        const ext = path.extname(filePath).toLowerCase().substring(1);
+
+        // Send file info back to webview
+        ConverterWebviewProvider.currentPanel?.webview.postMessage({
+            command: 'fileSelected',
+            data: {
+                path: filePath,
+                name: fileName,
+                extension: ext
+            }
+        });
+    }
+
 
     private async handleConversion(data: any) {
         try {
@@ -133,11 +142,24 @@ export class ConverterWebviewProvider {
             // Use provided output directory or default to source directory
             const outputDir = data.outputDir || path.dirname(data.filePath);
     
+            // Get stats before conversion
+            const origStat = await vscode.workspace.fs.stat(vscode.Uri.file(fileInfo.path));
+
             const result = await this.conversionManager.convert(
                 fileInfo,
                 data.targetFormat,
                 outputDir
             );
+            
+            let sizeMsg = "";
+            if (result.success && result.outputPath) {
+                try {
+                     const newStat = await vscode.workspace.fs.stat(vscode.Uri.file(result.outputPath));
+                     const savings = ((origStat.size - newStat.size) / origStat.size * 100).toFixed(1);
+                     const savedBytes = origStat.size - newStat.size;
+                     if (savedBytes > 0) sizeMsg = ` (Saved ${savings}%)`;
+                } catch (e) { /* ignore */ }
+            }
 
             // Auto-open if enabled
             const config = vscode.workspace.getConfiguration('fluxify');
@@ -155,7 +177,7 @@ export class ConverterWebviewProvider {
                 data: {
                     success: result.success,
                     message: result.success 
-                        ? `✅ Fluxified to ${data.targetFormat.toUpperCase()}!`
+                        ? `✅ Fluxified to ${data.targetFormat.toUpperCase()}!${sizeMsg}`
                         : `❌ Conversion failed: ${result.error}`
                 }
             });
@@ -572,6 +594,26 @@ export class ConverterWebviewProvider {
         .message.success { background: rgba(16, 185, 129, 0.1); color: var(--success); }
         .message.error { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
 
+        /* Confetti */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            animation: confetti-fall 3s linear forwards;
+            z-index: 1000;
+        }
+        @keyframes confetti-fall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+        }
+
+        .upload-zone.drag-over {
+            border-color: var(--primary);
+            background: rgba(0, 212, 255, 0.1);
+            transform: scale(1.02);
+        }
+
     </style>
 </head>
 <body>
@@ -738,6 +780,49 @@ export class ConverterWebviewProvider {
             vscode.postMessage({ command: 'selectDirectory' });
         });
 
+        // Drag & Drop Handling
+        const dropZone = document.getElementById('uploadZone');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('drag-over');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                // VS Code webview can't access full path directly from File object in some contexts,
+                // but if we are in Electron it might work, or we send what we have.
+                // Actually, for webviews, we might not get the full path easily security-wise.
+                // However, users requested this feature. Let's try sending the path if available.
+                // In VS Code webviews, File object might have 'path' property which is the absolute path.
+                
+                if (file.path) {
+                     vscode.postMessage({ 
+                        command: 'fileDropped', 
+                        data: { path: file.path }
+                    });
+                } else {
+                    // Fallback or error
+                    const messageBox = document.getElementById('messageBox');
+                    messageBox.textContent = "Cannot detect file path from drag & drop. Please use the click to upload.";
+                    messageBox.className = 'message error active';
+                }
+            }
+        });
+
         // Format button clicks
         document.getElementById('formatGrid').addEventListener('click', (e) => {
             const btn = e.target.closest('.format-btn');
@@ -834,6 +919,8 @@ export class ConverterWebviewProvider {
                         messageBox.textContent = message.data.message;
                         messageBox.className = 'message success active';
                         
+                        celebrateSuccess();
+                        
                         // Re-enable button
                         const btn = document.getElementById('convertBtn');
                         btn.textContent = 'Fluxify Again';
@@ -884,6 +971,22 @@ export class ConverterWebviewProvider {
                 btn.textContent = format.toUpperCase();
                 formatGrid.appendChild(btn);
             });
+        }
+
+        
+        function celebrateSuccess() {
+            const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                confetti.style.opacity = Math.random();
+                document.body.appendChild(confetti);
+                
+                setTimeout(() => confetti.remove(), 4000);
+            }
         }
     </script>
 </body>
