@@ -24,6 +24,7 @@ export class ConversionManager {
         bmp: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'tiff', 'pdf'],
         tiff: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'pdf'],
         tif: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'pdf'],
+        pdf: ['png', 'jpg', 'jpeg', 'webp', 'txt', 'docx', 'md'], // Expanded Support
         docx: ['pdf', 'txt', 'html', 'md'],
         doc: ['pdf', 'txt', 'html', 'md'],
         txt: ['pdf', 'html', 'md', 'docx'],
@@ -71,6 +72,16 @@ export class ConversionManager {
         };
 
         try {
+            // Special routing for PDF -> Image
+            if (fileInfo.extension.toLowerCase() === 'pdf' && ['png', 'jpg', 'jpeg', 'webp'].includes(targetFormat.toLowerCase())) {
+                 return await this.imageConverter.convertImage(fileInfo, targetFormat, outputDir, finalOptions);
+            }
+
+            // Special routing for PDF -> Document (Text/Word)
+            if (fileInfo.extension.toLowerCase() === 'pdf' && ['txt', 'docx', 'md'].includes(targetFormat.toLowerCase())) {
+                return await this.documentConverter.convertDocument(fileInfo, targetFormat, outputDir, finalOptions);
+            }
+
             switch (category) {
                 case 'image':
                     return await this.imageConverter.convertImage(fileInfo, targetFormat, outputDir, finalOptions);
@@ -95,7 +106,7 @@ export class ConversionManager {
     private getFileCategory(extension: string): 'image' | 'document' | 'data' | 'unknown' {
         const ext = extension.toLowerCase();
         if (this.FILE_CATEGORIES.image.includes(ext)) { return 'image'; }
-        if (this.FILE_CATEGORIES.document.includes(ext)) { return 'document'; }
+        if (this.FILE_CATEGORIES.document.includes(ext)) { return 'document'; } // PDF is here
         if (this.FILE_CATEGORIES.data.includes(ext)) { return 'data'; }
         return 'unknown';
     }

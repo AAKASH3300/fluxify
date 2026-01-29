@@ -12,7 +12,15 @@ export function activate(context: vscode.ExtensionContext) {
 
 
     const conversionManager = new ConversionManager();
-    const webviewProvider = new ConverterWebviewProvider(context.extensionUri);
+    
+    // Register History Provider (Initialize FIRST)
+    const historyManager = new HistoryManager(context);
+    const historyProvider = new HistoryTreeProvider(historyManager);
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider('fluxify.historyView', historyProvider)
+    );
+
+    const webviewProvider = new ConverterWebviewProvider(context.extensionUri, historyManager);
 
     // Register Webview Command
     const openConverterCommand = vscode.commands.registerCommand(
@@ -23,16 +31,9 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // Register Sidebar Provider
-    const sidebarProvider = new SidebarProvider(context.extensionUri);
+    const sidebarProvider = new SidebarProvider(context.extensionUri, historyManager);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(SidebarProvider.viewType, sidebarProvider)
-    );
-
-    // Register History Provider
-    const historyManager = new HistoryManager(context);
-    const historyProvider = new HistoryTreeProvider(historyManager);
-    context.subscriptions.push(
-        vscode.window.registerTreeDataProvider('fluxify.historyView', historyProvider)
     );
 
     // Register History Commands
@@ -133,19 +134,21 @@ async function handleConversion(uri: vscode.Uri, manager: ConversionManager, his
                 if (result.outputPath) {
                     try {
                          const newStat = await vscode.workspace.fs.stat(vscode.Uri.file(result.outputPath));
+                         const formattedSize = formatBytes(newStat.size);
                          const savings = ((origStat.size - newStat.size) / origStat.size * 100).toFixed(1);
                          const savedBytes = origStat.size - newStat.size;
                          
                          if (savedBytes > 0) {
-                             sizeMsg = ` Saved ${savings}%!`;
+                             sizeMsg = ` (Saved ${savings}% • ${formattedSize})`;
+                         } else {
+                             sizeMsg = ` (${formattedSize})`;
                          }
                     } catch (e) { /* ignore size check errors */ }
                 }
 
                 if (config.get<boolean>('autoOpenFile', true) && result.outputPath) {
                     try {
-                        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(result.outputPath));
-                        await vscode.window.showTextDocument(doc);
+                        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(result.outputPath));
                     } catch (error) {
                         console.error('Failed to auto-open file:', error);
                     }
@@ -326,4 +329,13 @@ function getCommonTargetFormats(uris: vscode.Uri[], manager: ConversionManager):
     }
     
     return commonFormats;
+}
+
+function formatBytes(bytes: number, decimals = 1) {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }

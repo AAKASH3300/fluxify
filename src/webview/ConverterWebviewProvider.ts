@@ -1,16 +1,19 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ConversionManager } from '../converters/ConversionManager';
+import { HistoryManager } from '../history/HistoryManager';
 import { FileInfo } from '../types/FileInfo';
 
 export class ConverterWebviewProvider {
     private static currentPanel: vscode.WebviewPanel | undefined;
     private readonly extensionUri: vscode.Uri;
     private readonly conversionManager: ConversionManager;
+    private readonly historyManager: HistoryManager;
 
-    constructor(extensionUri: vscode.Uri) {
+    constructor(extensionUri: vscode.Uri, historyManager: HistoryManager) {
         this.extensionUri = extensionUri;
         this.conversionManager = new ConversionManager();
+        this.historyManager = historyManager;
     }
 
     public showConverterPanel() {
@@ -76,6 +79,21 @@ export class ConverterWebviewProvider {
             null,
             []
         );
+
+        // Listen for history updates
+        const historyListener = this.historyManager.onDidChangeHistory(() => {
+            if (ConverterWebviewProvider.currentPanel) {
+                ConverterWebviewProvider.currentPanel.webview.postMessage({
+                    command: 'historyUpdated',
+                    data: this.historyManager.getHistory()
+                });
+            }
+        });
+
+        // specific disposable for history listener provided by VS Code
+        panel.onDidDispose(() => {
+            historyListener.dispose();
+        });
     }
 
     private async handleDirectorySelection() {
@@ -155,9 +173,16 @@ export class ConverterWebviewProvider {
             if (result.success && result.outputPath) {
                 try {
                      const newStat = await vscode.workspace.fs.stat(vscode.Uri.file(result.outputPath));
+                     const formattedSize = this.formatBytes(newStat.size);
+                     
                      const savings = ((origStat.size - newStat.size) / origStat.size * 100).toFixed(1);
                      const savedBytes = origStat.size - newStat.size;
-                     if (savedBytes > 0) sizeMsg = ` (Saved ${savings}%)`;
+                     
+                     if (savedBytes > 0) {
+                         sizeMsg = ` (Saved ${savings}% • ${formattedSize})`;
+                     } else {
+                         sizeMsg = ` (${formattedSize})`;
+                     }
                 } catch (e) { /* ignore */ }
             }
 
@@ -165,11 +190,29 @@ export class ConverterWebviewProvider {
             const config = vscode.workspace.getConfiguration('fluxify');
             if (result.success && config.get<boolean>('autoOpenFile', true) && result.outputPath) {
                 try {
-                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(result.outputPath));
-                    await vscode.window.showTextDocument(doc);
+                    await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(result.outputPath));
                 } catch (error) {
                     console.error('Failed to auto-open file from webview:', error);
+                    // Fallback to text document if vscode.open fails (unlikely)
+                    try {
+                        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(result.outputPath));
+                        await vscode.window.showTextDocument(doc);
+                    } catch (e) { /* give up */ }
                 }
+            }
+
+            // Add to history
+            if (result.success && result.outputPath) {
+                try {
+                     const newStat = await vscode.workspace.fs.stat(vscode.Uri.file(result.outputPath));
+                     this.historyManager.add({
+                        sourcePath: fileInfo.path,
+                        targetPath: result.outputPath,
+                        sourceFormat: fileInfo.extension,
+                        targetFormat: data.targetFormat,
+                        fileSize: newStat.size
+                     });
+                } catch (e) { /* ignore */ }
             }
     
             ConverterWebviewProvider.currentPanel?.webview.postMessage({
@@ -190,6 +233,15 @@ export class ConverterWebviewProvider {
                 }
             });
         }
+    }
+
+    private formatBytes(bytes: number, decimals = 1) {
+        if (!+bytes) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
     }
 
     private getWebviewContent(webview: vscode.Webview): string {
@@ -737,6 +789,18 @@ export class ConverterWebviewProvider {
                         <div class="tag">JSON</div> <div class="tag">CSV</div> <div class="tag">XML</div> <div class="tag">YAML</div>
                     </div>
                 </div>
+
+                <!-- History Card -->
+                <div class="card">
+                     <div class="card-title">
+                        <span>🕒</span> Recent History
+                    </div>
+                    <div id="historyList" style="max-height: 300px; overflow-y: auto;">
+                        <div style="text-align: center; color: var(--text-dim); font-size: 0.85rem; padding: 20px;">
+                            No recent conversions
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -746,6 +810,9 @@ export class ConverterWebviewProvider {
         let selectedFile = null;
         let selectedFormat = null;
         let outputDirectory = null;
+
+        // Initial History Data
+        const initialHistory = ${JSON.stringify(this.historyManager.getHistory())};
 
         // Accurate format mappings
         const conversionPaths = {
@@ -757,6 +824,7 @@ export class ConverterWebviewProvider {
             'bmp': ['png', 'jpg', 'jpeg', 'webp', 'gif', 'tiff', 'pdf'],
             'tiff': ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'pdf'],
             'tif': ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'pdf'],
+            'pdf': ['png', 'jpg', 'jpeg', 'webp', 'txt', 'docx', 'md'],
             'docx': ['pdf', 'txt', 'html', 'md'],
             'doc': ['pdf', 'txt', 'html', 'md'],
             'txt': ['pdf', 'html', 'md', 'docx'],
@@ -771,6 +839,9 @@ export class ConverterWebviewProvider {
         };
 
         // Upload zone click
+        // Render initial history
+        renderHistory(initialHistory);
+
         document.getElementById('uploadZone').addEventListener('click', () => {
             vscode.postMessage({ command: 'selectFile' });
         });
@@ -951,8 +1022,40 @@ export class ConverterWebviewProvider {
                     // Reset progress
                     document.getElementById('progressFill').style.width = '0%';
                     break;
+                
+                case 'historyUpdated':
+                    renderHistory(message.data);
+                    break;
             }
         });
+
+        function renderHistory(items) {
+            const container = document.getElementById('historyList');
+            if (!items || items.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: var(--text-dim); font-size: 0.85rem; padding: 20px;">No recent conversions</div>';
+                return;
+            }
+
+            container.innerHTML = items.map(item => {
+                const date = new Date(item.timestamp);
+                const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                return \`
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <div style="overflow: hidden;">
+                            <div style="font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="\${item.sourcePath}">
+                                \${item.sourcePath.split(/[\\\\/]/).pop()}
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-dim);">
+                                \${item.sourceFormat.toUpperCase()} ➔ \${item.targetFormat.toUpperCase()} • \${timeStr}
+                            </div>
+                        </div>
+                        <div style="font-size: 1.2rem; margin-left: 10px;">
+                             \${item.targetFormat === 'pdf' ? '📄' : '🖼️'}
+                        </div>
+                    </div>
+                \`;
+            }).join('');
+        }
 
         function updateFormatButtons(sourceExtension) {
             const formatGrid = document.getElementById('formatGrid');

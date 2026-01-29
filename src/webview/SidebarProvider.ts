@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ConversionManager } from '../converters/ConversionManager';
+import { HistoryManager } from '../history/HistoryManager';
 import { FileInfo } from '../types/FileInfo';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
@@ -8,10 +9,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private readonly extensionUri: vscode.Uri;
     private readonly conversionManager: ConversionManager;
+    private readonly historyManager: HistoryManager;
 
-    constructor(extensionUri: vscode.Uri) {
+    constructor(extensionUri: vscode.Uri, historyManager: HistoryManager) {
         this.extensionUri = extensionUri;
         this.conversionManager = new ConversionManager();
+        this.historyManager = historyManager;
     }
 
     public resolveWebviewView(
@@ -104,18 +107,69 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     
             const outputDir = data.outputDir || path.dirname(data.filePath);
     
+            // Get stats before conversion
+            let origSize = 0;
+            try {
+                const stat = await vscode.workspace.fs.stat(vscode.Uri.file(fileInfo.path));
+                origSize = stat.size;
+            } catch (e) { /* ignore */ }
+    
             const result = await this.conversionManager.convert(
                 fileInfo,
                 data.targetFormat,
                 outputDir
             );
+
+            // Calculate savings and handle auto-open
+            let sizeMsg = "";
+            if (result.success && result.outputPath) {
+                try {
+                     const newStat = await vscode.workspace.fs.stat(vscode.Uri.file(result.outputPath));
+                     const formattedSize = this.formatBytes(newStat.size);
+                     
+                     if (origSize > 0) {
+                        const savings = ((origSize - newStat.size) / origSize * 100).toFixed(1);
+                        const savedBytes = origSize - newStat.size;
+                        
+                        if (savedBytes > 0) {
+                            sizeMsg = ` (Saved ${savings}% • ${formattedSize})`;
+                        } else {
+                            sizeMsg = ` (${formattedSize})`;
+                        }
+                     } else {
+                        sizeMsg = ` (${formattedSize})`;
+                     }
+                } catch (e) { /* ignore */ }
+
+                // Auto-open if enabled
+                const config = vscode.workspace.getConfiguration('fluxify');
+                if (config.get<boolean>('autoOpenFile', true)) {
+                    try {
+                        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(result.outputPath));
+                    } catch (error) {
+                        console.error('Failed to auto-open file from sidebar:', error);
+                    }
+                }
+
+                // Add to history
+                try {
+                     const newStat = await vscode.workspace.fs.stat(vscode.Uri.file(result.outputPath));
+                     this.historyManager.add({
+                        sourcePath: fileInfo.path,
+                        targetPath: result.outputPath,
+                        sourceFormat: fileInfo.extension,
+                        targetFormat: data.targetFormat,
+                        fileSize: newStat.size
+                     });
+                } catch (e) { /* ignore */ }
+            }
     
             this._view?.webview.postMessage({
                 command: result.success ? 'conversionComplete' : 'conversionError',
                 data: {
                     success: result.success,
                     message: result.success 
-                        ? `✅ Fluxified to ${data.targetFormat.toUpperCase()}!`
+                        ? `✅ Fluxified to ${data.targetFormat.toUpperCase()}!${sizeMsg}`
                         : `❌ Conversion failed: ${result.error}`
                 }
             });
@@ -128,6 +182,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 }
             });
         }
+    }
+
+    private formatBytes(bytes: number, decimals = 1) {
+        if (!+bytes) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
     }
 
     private getWebviewContent(webview: vscode.Webview): string {
@@ -452,6 +515,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             'bmp': ['png', 'jpg', 'jpeg', 'webp', 'gif', 'tiff', 'pdf'],
             'tiff': ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'pdf'],
             'tif': ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'pdf'],
+            'pdf': ['png', 'jpg', 'jpeg', 'webp', 'txt', 'docx', 'md'],
             'docx': ['pdf', 'txt', 'html', 'md'],
             'doc': ['pdf', 'txt', 'html', 'md'],
             'txt': ['pdf', 'html', 'md', 'docx'],

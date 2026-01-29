@@ -5,6 +5,7 @@ import TurndownService = require('turndown');
 import * as docx from 'docx';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+const pdfParse = require('pdf-parse');
 import { FileInfo, ConversionResult, ConversionOptions } from '../types/FileInfo';
 
 export class DocumentConverter {
@@ -47,14 +48,9 @@ export class DocumentConverter {
                 if (target === 'md') return await this.textToMarkdown(fileInfo, outputDir);
                 if (target === 'docx') return await this.textToDocx(fileInfo, outputDir);
             } else if (sourceFormat === 'pdf') {
-                 // PDF extraction is complex, maybe just to text?
-                 // Prompt said: pdf: ['png', 'jpg', 'jpeg', 'txt', 'html']
-                 // Since I am in DocumentConverter, handling txt/html.
-                 // We will skip PDF source here unless I implement libraries for that (e.g. pdf.js-dist which is not in the list).
-                 // Wait, Phase 3 said: pdf: ['png', 'jpg', 'jpeg', 'txt', 'html']
-                 // I will strictly implement what libraries allow. 
-                 // Simple PDF text extraction?
-                 return { success: false, error: 'PDF source conversion not fully implemented in this phase.' };
+                 if (target === 'txt') return await this.pdfToText(fileInfo, outputDir);
+                 if (target === 'md') return await this.pdfToMarkdown(fileInfo, outputDir);
+                 if (target === 'docx') return await this.pdfToDocx(fileInfo, outputDir);
             }
 
             return { success: false, error: `Conversion from ${sourceFormat} to ${target} not supported.` };
@@ -141,6 +137,33 @@ export class DocumentConverter {
         const content = await fs.readFile(fileInfo.path, 'utf-8');
         const text = content.replace(/<[^>]*>/g, '');
         return await this.textToPdfHelper(text, fileInfo.nameWithoutExt, outputDir);
+    }
+
+    // PDF Methods
+    private async pdfToText(fileInfo: FileInfo, outputDir: string): Promise<ConversionResult> {
+        const text = await this.extractPdfText(fileInfo.path);
+        const outputPath = path.join(outputDir, `${fileInfo.nameWithoutExt}.txt`);
+        await fs.writeFile(outputPath, text);
+        return { success: true, outputPath };
+    }
+
+    private async pdfToMarkdown(fileInfo: FileInfo, outputDir: string): Promise<ConversionResult> {
+        const text = await this.extractPdfText(fileInfo.path);
+        // Simple wrap? maybe just text for now
+        const outputPath = path.join(outputDir, `${fileInfo.nameWithoutExt}.md`);
+        await fs.writeFile(outputPath, text);
+        return { success: true, outputPath };
+    }
+
+    private async pdfToDocx(fileInfo: FileInfo, outputDir: string): Promise<ConversionResult> {
+        const text = await this.extractPdfText(fileInfo.path);
+        return await this.textToDocxHelper(text, fileInfo.nameWithoutExt, outputDir);
+    }
+
+    private async extractPdfText(filePath: string): Promise<string> {
+        const dataBuffer = await fs.readFile(filePath);
+        const data = await pdfParse(dataBuffer);
+        return data.text;
     }
 
     // Text Methods

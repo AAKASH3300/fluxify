@@ -13,7 +13,14 @@ export class ImageConverter {
     ): Promise<ConversionResult> {
         try {
             const outputPath = path.join(outputDir, `${fileInfo.nameWithoutExt}.${targetFormat}`);
-            let processor = sharp(fileInfo.path);
+            
+            // Special handling for PDF input to ensure high quality
+            let processor;
+            if (fileInfo.extension.toLowerCase() === 'pdf') {
+                processor = sharp(fileInfo.path, { density: 300 }); // 300 DPI for crisp text
+            } else {
+                processor = sharp(fileInfo.path);
+            }
 
             // Resize if needed
             if (options?.width || options?.height) {
