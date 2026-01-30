@@ -1,8 +1,12 @@
-import sharp from 'sharp';
-import { PDFDocument } from 'pdf-lib';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { FileInfo, ConversionResult, ConversionOptions } from '../types/FileInfo';
+
+// Lazy load types if possible, or just use any for external libs in implementation
+// We keep imports used for TYPES only if devDependencies are present, 
+// but for runtime we need require. 
+// Since we don't want to mess up types, we can assume types are available at compile time.
+// But we cannot have top-level imports that trigger require() at runtime.
 
 export class ImageConverter {
     async convertImage(
@@ -12,6 +16,9 @@ export class ImageConverter {
         options?: ConversionOptions
     ): Promise<ConversionResult> {
         try {
+            // Lazy load sharp
+            const sharp = require('sharp');
+
             const outputPath = path.join(outputDir, `${fileInfo.nameWithoutExt}.${targetFormat}`);
             
             // Special handling for PDF input to ensure high quality
@@ -97,6 +104,13 @@ export class ImageConverter {
             return { success: true, outputPath };
 
         } catch (error: any) {
+             // Improve error message for missing sharp
+             if (error.code === 'MODULE_NOT_FOUND') {
+                return {
+                    success: false,
+                    error: 'The "sharp" library is missing or incompatible. Please ensure native dependencies are installed correctly.'
+                };
+             }
             return {
                 success: false,
                 error: `Image conversion failed: ${error.message}`
@@ -110,6 +124,10 @@ export class ImageConverter {
         options?: ConversionOptions
     ): Promise<ConversionResult> {
         try {
+            // Lazy load dependencies
+            const sharp = require('sharp');
+            const { PDFDocument } = require('pdf-lib');
+
             const outputPath = path.join(outputDir, `${fileInfo.nameWithoutExt}.pdf`);
             const imageBuffer = await fs.readFile(fileInfo.path);
             
@@ -122,13 +140,13 @@ export class ImageConverter {
             if (isPng) {
                 // Ensure it is PNG (sharp can clean it up/ensure headers)
                  const pngBuffer = await sharp(imageBuffer).png().toBuffer();
-                 pdfImage = await pdfDoc.embedPng(pngBuffer as unknown as Uint8Array);
+                 pdfImage = await pdfDoc.embedPng(pngBuffer);
             } else {
                  // Convert to JPG for embedding if not PNG (usually smaller/safer for PDF unless transparency needed)
                  // But if it's already JPG, just embed.
                  // However, safe route: convert to jpg buffer
                  const jpgBuffer = await sharp(imageBuffer).jpeg().toBuffer();
-                 pdfImage = await pdfDoc.embedJpg(jpgBuffer as unknown as Uint8Array);
+                 pdfImage = await pdfDoc.embedJpg(jpgBuffer);
             }
 
             const page = pdfDoc.addPage([image.width || 600, image.height || 800]);
@@ -151,7 +169,8 @@ export class ImageConverter {
         }
     }
 
-    async getImageInfo(filePath: string): Promise<sharp.Metadata> {
+    async getImageInfo(filePath: string): Promise<any> {
+        const sharp = require('sharp');
         return await sharp(filePath).metadata();
     }
 }

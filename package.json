@@ -2,7 +2,7 @@
   "name": "fluxify",
   "displayName": "Fluxify - File Format Converter",
   "description": "Transform files between 25+ formats with style. Images, documents, and data - all in one beautiful interface.",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "publisher": "AakashBalasubramanian",
   "icon": "resources/fluxify-icon.png",
   "engines": {

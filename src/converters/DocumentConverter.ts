@@ -1,21 +1,30 @@
-import * as pdfLib from 'pdf-lib';
-import * as mammoth from 'mammoth';
-import { marked } from 'marked';
-import TurndownService = require('turndown');
-import * as docx from 'docx';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-const pdfParse = require('pdf-parse');
 import { FileInfo, ConversionResult, ConversionOptions } from '../types/FileInfo';
 
 export class DocumentConverter {
-    private turndownService: TurndownService;
+    // private turndownService: TurndownService; // Remove property to avoid type issues if import is removed
+    private turndownService: any; 
 
     constructor() {
-        this.turndownService = new TurndownService({
-            headingStyle: 'atx',
-            codeBlockStyle: 'fenced'
-        });
+        // Initialize turndown lazily or storing null, but better to allow lazy init in methods or init here if it doesn't break
+        // Actually, TurndownService is a require, so we can init here if we require it here.
+        // But constructor runs at instantiation. Is instantiation safe?
+        // Extension activates -> creates ConversionManager -> creates DocumentConverter -> runs constructor.
+        // So constructor IS NOT safe for native modules if they crash on load. 
+        // Turndown is JS usually, but let's be safe.
+        // We will init it on demand.
+    }
+
+    private getTurndownService() {
+        if (!this.turndownService) {
+            const TurndownService = require('turndown');
+            this.turndownService = new TurndownService({
+                headingStyle: 'atx',
+                codeBlockStyle: 'fenced'
+            });
+        }
+        return this.turndownService;
     }
 
     async convertDocument(
@@ -56,12 +65,16 @@ export class DocumentConverter {
             return { success: false, error: `Conversion from ${sourceFormat} to ${target} not supported.` };
 
         } catch (error: any) {
+            if (error.code === 'MODULE_NOT_FOUND') {
+                 return { success: false, error: `Missing dependency: ${error.message}. Please reinstall extension.` };
+            }
             return { success: false, error: `Document conversion failed: ${error.message}` };
         }
     }
 
     // DOCX Methods
     private async docxToHtml(fileInfo: FileInfo, outputDir: string): Promise<ConversionResult> {
+        const mammoth = require('mammoth');
         const result = await mammoth.convertToHtml({ path: fileInfo.path });
         const outputPath = path.join(outputDir, `${fileInfo.nameWithoutExt}.html`);
         await fs.writeFile(outputPath, result.value);
@@ -69,6 +82,7 @@ export class DocumentConverter {
     }
 
     private async docxToText(fileInfo: FileInfo, outputDir: string): Promise<ConversionResult> {
+        const mammoth = require('mammoth');
         const result = await mammoth.extractRawText({ path: fileInfo.path });
         const outputPath = path.join(outputDir, `${fileInfo.nameWithoutExt}.txt`);
         await fs.writeFile(outputPath, result.value);
@@ -76,14 +90,16 @@ export class DocumentConverter {
     }
 
     private async docxToMarkdown(fileInfo: FileInfo, outputDir: string): Promise<ConversionResult> {
+        const mammoth = require('mammoth');
         const htmlResult = await mammoth.convertToHtml({ path: fileInfo.path });
-        const markdown = this.turndownService.turndown(htmlResult.value);
+        const markdown = this.getTurndownService().turndown(htmlResult.value);
         const outputPath = path.join(outputDir, `${fileInfo.nameWithoutExt}.md`);
         await fs.writeFile(outputPath, markdown);
         return { success: true, outputPath };
     }
 
     private async docxToPdf(fileInfo: FileInfo, outputDir: string): Promise<ConversionResult> {
+        const mammoth = require('mammoth');
         // Extract text and wrap
         const result = await mammoth.extractRawText({ path: fileInfo.path });
         return await this.textToPdfHelper(result.value, fileInfo.nameWithoutExt, outputDir);
@@ -91,6 +107,7 @@ export class DocumentConverter {
 
     // Markdown Methods
     private async markdownToHtml(fileInfo: FileInfo, outputDir: string): Promise<ConversionResult> {
+        const { marked } = require('marked');
         const content = await fs.readFile(fileInfo.path, 'utf-8');
         const html = await marked.parse(content);
         const outputPath = path.join(outputDir, `${fileInfo.nameWithoutExt}.html`);
@@ -119,7 +136,7 @@ export class DocumentConverter {
     // HTML Methods
     private async htmlToMarkdown(fileInfo: FileInfo, outputDir: string): Promise<ConversionResult> {
         const content = await fs.readFile(fileInfo.path, 'utf-8');
-        const markdown = this.turndownService.turndown(content);
+        const markdown = this.getTurndownService().turndown(content);
         const outputPath = path.join(outputDir, `${fileInfo.nameWithoutExt}.md`);
         await fs.writeFile(outputPath, markdown);
         return { success: true, outputPath };
@@ -161,6 +178,7 @@ export class DocumentConverter {
     }
 
     private async extractPdfText(filePath: string): Promise<string> {
+        const pdfParse = require('pdf-parse');
         const dataBuffer = await fs.readFile(filePath);
         const data = await pdfParse(dataBuffer);
         return data.text;
@@ -195,7 +213,9 @@ export class DocumentConverter {
 
     // Helpers
     private async textToPdfHelper(text: string, filename: string, outputDir: string): Promise<ConversionResult> {
-        const pdfDoc = await pdfLib.PDFDocument.create();
+        const { PDFDocument } = require('pdf-lib');
+        
+        const pdfDoc = await PDFDocument.create();
         let page = pdfDoc.addPage();
         const { width, height } = page.getSize();
         const fontSize = 12;
@@ -221,10 +241,11 @@ export class DocumentConverter {
     }
 
     private async textToDocxHelper(text: string, filename: string, outputDir: string): Promise<ConversionResult> {
+         const docx = require('docx');
          const doc = new docx.Document({
             sections: [{
                 properties: {},
-                children: text.split('\n').map(line => 
+                children: text.split('\n').map((line: string) => 
                     new docx.Paragraph({
                         children: [new docx.TextRun(line)],
                     })

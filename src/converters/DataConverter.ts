@@ -1,6 +1,3 @@
-import * as Papa from 'papaparse';
-import * as yaml from 'js-yaml';
-import * as xml2js from 'xml2js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { FileInfo, ConversionResult, ConversionOptions } from '../types/FileInfo';
@@ -13,6 +10,10 @@ export class DataConverter {
         options?: ConversionOptions
     ): Promise<ConversionResult> {
         try {
+            // Lazy load dependencies for this method
+            const yaml = require('js-yaml');
+            const xml2js = require('xml2js');
+
             // 1. Parse Source
             let data: any;
             const sourceFormat = fileInfo.extension.toLowerCase();
@@ -66,12 +67,16 @@ export class DataConverter {
             return { success: true, outputPath };
 
         } catch (error: any) {
+            if (error.code === 'MODULE_NOT_FOUND') {
+                 return { success: false, error: `Missing dependency: ${error.message}. Please reinstall extension.` };
+            }
             return { success: false, error: `Data conversion failed: ${error.message}` };
         }
     }
 
     private parseCsv(content: string): Promise<any> {
         return new Promise((resolve, reject) => {
+            const Papa = require('papaparse');
             Papa.parse(content, {
                 header: true,
                 dynamicTyping: true,
@@ -82,11 +87,13 @@ export class DataConverter {
     }
 
     private parseXml(content: string): Promise<any> {
+        const xml2js = require('xml2js');
         const parser = new xml2js.Parser({ explicitArray: false });
         return parser.parseStringPromise(content);
     }
 
     private toCsv(data: any): string {
+        const Papa = require('papaparse');
         if (Array.isArray(data)) {
             return Papa.unparse(data);
         } else if (typeof data === 'object' && data !== null) {
@@ -97,6 +104,7 @@ export class DataConverter {
     }
 
     private toXml(data: any): string {
+        const xml2js = require('xml2js');
         const builder = new xml2js.Builder({ rootName: 'root' });
         return builder.buildObject(data);
     }
