@@ -2,8 +2,33 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { FileInfo, ConversionResult, ConversionOptions } from '../types/FileInfo';
 
+
+// Polyfill for DOMMatrix in Node.js environment
+if (typeof (global as any).DOMMatrix === 'undefined') {
+    (global as any).DOMMatrix = class DOMMatrix {
+        public a: number;
+        public b: number;
+        public c: number;
+        public d: number;
+        public e: number;
+        public f: number;
+
+        constructor() {
+            this.a = 1; this.b = 0;
+            this.c = 0; this.d = 1;
+            this.e = 0; this.f = 0;
+        }
+        // Minimal properties to satisfy basic usage
+        get is2D() { return true; }
+        get isIdentity() { return true; }
+        translate() { return this; }
+        scale() { return this; }
+        rotate() { return this; }
+        transformPoint(p: any) { return p; }
+    };
+}
+
 export class DocumentConverter {
-    // private turndownService: TurndownService; // Remove property to avoid type issues if import is removed
     private turndownService: any; 
 
     constructor() {
@@ -178,10 +203,31 @@ export class DocumentConverter {
     }
 
     private async extractPdfText(filePath: string): Promise<string> {
-        const pdfParse = require('pdf-parse');
+        // Use pdfjs-dist directly via dynamic import
+        // We use eval('import') to prevent TypeScript from transpiling it to require()
+        const pdfjsLib = await (eval('import("pdfjs-dist/legacy/build/pdf.mjs")') as Promise<any>);
+        
         const dataBuffer = await fs.readFile(filePath);
-        const data = await pdfParse(dataBuffer);
-        return data.text;
+        const uint8Array = new Uint8Array(dataBuffer);
+        
+        const loadingTask = pdfjsLib.getDocument({ 
+            data: uint8Array,
+            // Suppress font warning by providing a dummy url or standard path if possible, 
+            // or just let it warn (it writes to console).
+            // standardFontDataUrl: 'node_modules/pdfjs-dist/standard_fonts/' 
+        });
+        
+        const doc = await loadingTask.promise;
+        let fullText = '';
+        
+        for (let i = 1; i <= doc.numPages; i++) {
+            const page = await doc.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map((item: any) => item.str).join(' ');
+            fullText += pageText + '\n';
+        }
+        
+        return fullText;
     }
 
     // Text Methods
